@@ -34,7 +34,14 @@ export function ToastProvider({ children }) {
     [removeToast]
   );
 
-  const value = useMemo(() => ({ addToast, removeToast }), [addToast, removeToast]);
+  const updateToast = useCallback((id, patch) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
+
+  const value = useMemo(
+    () => ({ addToast, removeToast, updateToast }),
+    [addToast, removeToast, updateToast]
+  );
 
   return (
     <ToastContext.Provider value={value}>

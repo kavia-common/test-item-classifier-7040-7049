@@ -20,7 +20,7 @@ function extOf(name) {
 // PUBLIC_INTERFACE
 export default function ImportPage() {
   /** Import flow UI: upload file -> backend import -> fetch suites/testcases and render in a table. */
-  const { addToast } = useToast();
+  const { addToast, removeToast } = useToast();
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -152,14 +152,18 @@ export default function ImportPage() {
 
       // Refresh suites and testcases after import
       await loadSuites();
-      await loadTestcases({ suiteIdParam: suiteId || (suites[0] ? String(suites[0].id) : ''), pageParam: 1, filtersParam: filters });
+      await loadTestcases({
+        suiteIdParam: suiteId || (suites[0] ? String(suites[0].id) : ''),
+        pageParam: 1,
+        filtersParam: filters,
+      });
       setPage(1);
     } catch (e) {
       addToast({ type: 'error', title: 'Import failed', message: e.message });
     } finally {
+      // Critical: always dismiss the indefinite progress toast so the UI doesn't appear stuck.
+      if (toastId) removeToast(toastId);
       setUploading(false);
-      // remove the indefinite toast by showing a short follow-up
-      addToast({ type: 'info', title: 'Status', message: 'You can upload another file anytime.' });
     }
   };
 
