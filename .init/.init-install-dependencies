@@ -1,0 +1,4 @@
+{
+    "command": "npm install",
+    "working_directory": "/home/kavia/workspace/code-generation/test-item-classifier-7040-7049/test_item_classification_frontend"
+}
