@@ -46,15 +46,49 @@ function buildUrl(path, query) {
   return url.toString();
 }
 
+/**
+ * Wrapper around fetch that turns network-level failures (CORS, DNS, backend down)
+ * into an Error message that includes the URL being called.
+ */
+async function safeFetch(url, options) {
+  try {
+    return await fetch(url, options);
+  } catch (e) {
+    // Browser network failures typically throw TypeError("Failed to fetch").
+    // Add context so the UI can guide the user to the actual root cause.
+    const hint =
+      `Network request failed.\n\n` +
+      `URL: ${url}\n` +
+      `Resolved API base: ${API_BASE}\n\n` +
+      `Common causes:\n` +
+      `- Backend not running / not reachable on that host+port\n` +
+      `- Wrong REACT_APP_API_BASE / REACT_APP_BACKEND_URL\n` +
+      `- CORS/preflight blocked by backend configuration\n`;
+    const msg = e?.message ? `${e.message}\n\n${hint}` : hint;
+    throw new Error(msg);
+  }
+}
+
+// PUBLIC_INTERFACE
+export async function checkBackendHealth() {
+  /** Calls GET / health endpoint; useful for diagnostics before upload. */
+  const resp = await safeFetch(buildUrl('/'), { method: 'GET', credentials: 'include' });
+  const data = await readJsonOrText(resp);
+  if (!resp.ok) throw new Error(data?.detail || 'Backend health check failed.');
+  return data;
+}
+
 // PUBLIC_INTERFACE
 export async function importTestPlanFile(file) {
   /** Uploads a CSV/XLSX as multipart/form-data to the backend import endpoint. */
   const form = new FormData();
   form.append('file', file);
 
-  const resp = await fetch(buildUrl('/import/testplan'), {
+  const resp = await safeFetch(buildUrl('/import/testplan'), {
     method: 'POST',
     body: form,
+    // Keep consistent with backend CORS allow_credentials=True.
+    credentials: 'include',
   });
 
   const data = await readJsonOrText(resp);
@@ -68,7 +102,7 @@ export async function importTestPlanFile(file) {
 // PUBLIC_INTERFACE
 export async function fetchSuites() {
   /** Fetch all suites with counts. */
-  const resp = await fetch(buildUrl('/suites'));
+  const resp = await safeFetch(buildUrl('/suites'), { credentials: 'include' });
   const data = await readJsonOrText(resp);
   if (!resp.ok) throw new Error(data?.detail || 'Failed to load suites.');
   return data;
@@ -77,14 +111,15 @@ export async function fetchSuites() {
 // PUBLIC_INTERFACE
 export async function fetchSuiteTestcases({ suiteId, page = 1, pageSize = 20, category, priority, search }) {
   /** Fetch paginated test cases for a suite with optional filters. */
-  const resp = await fetch(
+  const resp = await safeFetch(
     buildUrl(`/suites/${suiteId}/testcases`, {
       page,
       page_size: pageSize,
       category,
       priority,
       search,
-    })
+    }),
+    { credentials: 'include' }
   );
   const data = await readJsonOrText(resp);
   if (!resp.ok) throw new Error(data?.detail || 'Failed to load test cases.');
